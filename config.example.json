@@ -1,0 +1,7 @@
+[
+  {
+    "HOST": "https://your-host.example.com",
+    "API_KEY": "replace-with-your-api-key",
+    "NAME": "Primary"
+  }
+]
