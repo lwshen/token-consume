@@ -151,12 +151,10 @@ const buildSummary = (
     groups.set(config.HOST, existing);
   });
 
-  const hosts = Array.from(groups.values())
-    .map((host) => ({
-      ...host,
-      cost: computeCost(host.quota),
-    }))
-    .sort((a, b) => a.host.localeCompare(b.host));
+  const hosts = Array.from(groups.values()).map((host) => ({
+    ...host,
+    cost: computeCost(host.quota),
+  }));
 
   const overall = hosts.reduce(
     (acc, host) => {

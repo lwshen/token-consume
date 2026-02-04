@@ -20,7 +20,7 @@ const formatTimestamp = (value?: number) => {
 
 const formatCost = (value?: number) => {
   if (typeof value !== "number") return "—";
-  return value.toLocaleString(undefined, {
+  return "$" + value.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -92,7 +92,7 @@ const HostCard = ({ host }: { host: HostSummary }) => (
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200/70 bg-slate-50/90 px-4 py-3">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Last Updated</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Last Used</p>
           <p className="text-lg font-semibold text-slate-900">
             {formatTimestamp(host.latest)}
           </p>
@@ -220,7 +220,7 @@ export default function TokenDashboard({
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Last Updated</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Last Used</p>
               <p className="font-medium text-slate-800">
                 {formatTimestamp(overall.latest)}
               </p>
