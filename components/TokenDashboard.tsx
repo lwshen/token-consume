@@ -1,13 +1,24 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
-import type { HostSummary, TokenSummary, TokenSummaryResponse } from "@/lib/token-types";
+import type { DateRange, DateRangePreset, HostSummary, TokenSummary, TokenSummaryResponse } from "@/lib/token-types";
+import DateRangePicker from "./DateRangePicker";
 
 type TokenDashboardProps = {
   initialData?: TokenSummary | null;
   initialError?: string | null;
+  initialDateRange?: DateRange;
 };
+
+const isValidPreset = (value: string | null): value is DateRangePreset => {
+  return value === "all" || value === "24h" || value === "7d" || value === "30d" || value === "custom";
+};
+
+const getDefaultDateRange = (): DateRange => ({
+  preset: "30d",
+});
 
 const formatNumber = (value?: number) =>
   typeof value === "number" ? value.toLocaleString() : "—";
@@ -122,38 +133,116 @@ const HostCard = ({ host }: { host: HostSummary }) => (
 export default function TokenDashboard({
   initialData,
   initialError,
+  initialDateRange,
 }: TokenDashboardProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [data, setData] = useState<TokenSummary | null>(initialData ?? null);
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialError ?? null
   );
   const [isPending, startTransition] = useTransition();
 
+  const [dateRange, setDateRange] = useState<DateRange>(
+    initialDateRange ?? getDefaultDateRange()
+  );
+
   const overall = data?.overall ?? emptySummary.overall;
   const hosts = data?.hosts ?? emptySummary.hosts;
 
-  const handleRefresh = () => {
-    startTransition(async () => {
-      setErrorMessage(null);
-      let payload: TokenSummaryResponse | null = null;
+  const updateUrlParams = useCallback(
+    (newDateRange: DateRange) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("preset", newDateRange.preset);
 
-      try {
-        const response = await fetch("/api/token-consume", { cache: "no-store" });
-        payload = (await response.json()) as TokenSummaryResponse;
-
-        if (!response.ok || !payload.success) {
-          setErrorMessage(extractError(payload));
-          return;
+      if (newDateRange.preset === "custom") {
+        if (newDateRange.startDate) {
+          params.set("startDate", newDateRange.startDate);
+        } else {
+          params.delete("startDate");
         }
-
-        setData(payload.data);
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to refresh data."
-        );
+        if (newDateRange.endDate) {
+          params.set("endDate", newDateRange.endDate);
+        } else {
+          params.delete("endDate");
+        }
+      } else {
+        params.delete("startDate");
+        params.delete("endDate");
       }
-    });
+
+      router.replace(`${pathname}?${params.toString()}`);
+    },
+    [pathname, router, searchParams]
+  );
+
+  const fetchData = useCallback(
+    async (range: DateRange) => {
+      startTransition(async () => {
+        setErrorMessage(null);
+        let payload: TokenSummaryResponse | null = null;
+
+        try {
+          const params = new URLSearchParams();
+          params.set("preset", range.preset);
+          if (range.preset === "custom") {
+            if (range.startDate) params.set("startDate", range.startDate);
+            if (range.endDate) params.set("endDate", range.endDate);
+          }
+
+          const response = await fetch(`/api/token-consume?${params.toString()}`, {
+            cache: "no-store",
+          });
+          payload = (await response.json()) as TokenSummaryResponse;
+
+          if (!response.ok || !payload.success) {
+            setErrorMessage(extractError(payload));
+            return;
+          }
+
+          setData(payload.data);
+        } catch (error) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Unable to refresh data."
+          );
+        }
+      });
+    },
+    []
+  );
+
+  const handleDateRangeChange = useCallback(
+    (newDateRange: DateRange) => {
+      setDateRange(newDateRange);
+      updateUrlParams(newDateRange);
+      fetchData(newDateRange);
+    },
+    [fetchData, updateUrlParams]
+  );
+
+  const handleRefresh = () => {
+    fetchData(dateRange);
   };
+
+  useEffect(() => {
+    const presetParam = searchParams.get("preset");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+
+    if (presetParam) {
+      const preset = isValidPreset(presetParam) ? presetParam : "30d";
+      const newDateRange: DateRange = {
+        preset,
+        ...(preset === "custom" && {
+          startDate: startDateParam ?? undefined,
+          endDate: endDateParam ?? undefined,
+        }),
+      };
+      setDateRange(newDateRange);
+    }
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ed_0%,_#ecfeff_38%,_#eef2ff_75%)] text-slate-900">
@@ -163,15 +252,21 @@ export default function TokenDashboard({
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200/60 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm shadow-slate-100/60">
               Token Consume Monitor
             </div>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={isPending}
-              className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-100/60 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-              aria-busy={isPending}
-            >
-              {isPending ? "Refreshing" : "Refresh"}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <DateRangePicker
+                value={dateRange}
+                onChange={handleDateRangeChange}
+              />
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isPending}
+                className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-100/60 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                aria-busy={isPending}
+              >
+                {isPending ? "Refreshing" : "Refresh"}
+              </button>
+            </div>
           </div>
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">

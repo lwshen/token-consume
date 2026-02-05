@@ -28,3 +28,11 @@ export type TokenSummary = {
 export type TokenSummaryResponse =
   | { success: true; data: TokenSummary }
   | { success: false; message: string };
+
+export type DateRangePreset = "all" | "24h" | "7d" | "30d" | "custom";
+
+export interface DateRange {
+  preset: DateRangePreset;
+  startDate?: string;
+  endDate?: string;
+}
