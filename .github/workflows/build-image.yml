@@ -6,10 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  push_to_registry:
+  build_and_push:
     name: Push Docker image
     runs-on: ubuntu-latest
-    needs: build
     permissions:
       contents: read
       packages: write
