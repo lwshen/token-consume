@@ -256,7 +256,7 @@ export default function TokenDashboard({
         <header className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200/60 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm shadow-slate-100/60">
-              Token Consume Monitor
+              Token Analytics
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <DateRangePicker
@@ -270,18 +270,17 @@ export default function TokenDashboard({
                 className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-100/60 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                 aria-busy={isPending}
               >
-                {isPending ? "Refreshing" : "Refresh"}
+                {isPending ? "Refreshing..." : "Refresh"}
               </button>
             </div>
           </div>
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Aggregated token usage by host
+              Unified Token Dashboard
             </h1>
             <p className="max-w-2xl text-base leading-relaxed text-slate-600">
-              Reads a local <span className="font-semibold">config.json</span> list and
-              fetches token usage from every configured host. Results are aggregated per
-              host so you can compare usage in one place.
+              Monitor API token consumption across all your hosts in real-time. Track usage,
+              costs, and performance metrics from a single dashboard.
             </p>
           </div>
         </header>
@@ -337,14 +336,12 @@ export default function TokenDashboard({
         {errorMessage ? (
           <section className="rounded-3xl border border-rose-200 bg-rose-50/80 p-6 text-sm text-rose-700 shadow-lg shadow-rose-100">
             <h2 className="text-base font-semibold text-rose-800">
-              Unable to load token logs
+              Unable to load data
             </h2>
             <p className="mt-2">{errorMessage}</p>
             <p className="mt-3 text-rose-600">
-              Confirm that <span className="font-semibold">config.json</span> exists at the
-              project root and contains a list of entries with valid
-              <span className="font-semibold"> HOST</span> and
-              <span className="font-semibold"> API_KEY</span> values.
+              Please verify your <span className="font-semibold">config.json</span> file
+              is properly configured with valid host credentials.
             </p>
           </section>
         ) : null}
@@ -360,10 +357,10 @@ export default function TokenDashboard({
               {isPending ? (
                 <div className="flex flex-col items-center gap-3">
                   <LoadingSpinner />
-                  <p>Loading token log entries...</p>
+                  <p>Loading your data...</p>
                 </div>
               ) : (
-                "No token log entries returned yet."
+                "No data available. Check your configuration to get started."
               )}
             </div>
           ) : null}
