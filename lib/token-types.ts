@@ -36,3 +36,7 @@ export interface DateRange {
   startDate?: string;
   endDate?: string;
 }
+
+export const isValidPreset = (value: string | null): value is DateRangePreset => {
+  return value === "all" || value === "24h" || value === "7d" || value === "30d" || value === "custom";
+};

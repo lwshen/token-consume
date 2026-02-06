@@ -3,16 +3,13 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 
-import type { DateRange, DateRangePreset, HostSummary, TokenSummary, TokenSummaryResponse } from "@/lib/token-types";
+import type { DateRange, HostSummary, TokenSummary, TokenSummaryResponse } from "@/lib/token-types";
+import { isValidPreset } from "@/lib/token-types";
 import DateRangePicker from "./DateRangePicker";
 
 type TokenDashboardProps = {
   initialData?: TokenSummary | null;
   initialError?: string | null;
-};
-
-const isValidPreset = (value: string | null): value is DateRangePreset => {
-  return value === "all" || value === "24h" || value === "7d" || value === "30d" || value === "custom";
 };
 
 const getDefaultDateRange = (): DateRange => ({

@@ -3,12 +3,9 @@ import { NextResponse } from "next/server";
 
 import { getTokenSummary } from "@/lib/token-summary";
 import type { DateRange, DateRangePreset, TokenSummaryResponse } from "@/lib/token-types";
+import { isValidPreset } from "@/lib/token-types";
 
 export const dynamic = "force-dynamic";
-
-const isValidPreset = (value: string | null): value is DateRangePreset => {
-  return value === "all" || value === "24h" || value === "7d" || value === "30d" || value === "custom";
-};
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
