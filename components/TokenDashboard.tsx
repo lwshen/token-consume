@@ -1,12 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
-import type { HostSummary, TokenSummary, TokenSummaryResponse } from "@/lib/token-types";
+import type { DateRange, HostSummary, TokenSummary, TokenSummaryResponse } from "@/lib/token-types";
+import { isValidPreset } from "@/lib/token-types";
+import DateRangePicker from "./DateRangePicker";
 
 type TokenDashboardProps = {
   initialData?: TokenSummary | null;
   initialError?: string | null;
+};
+
+const getDefaultDateRange = (): DateRange => ({
+  preset: "30d",
+});
+
+const parseDateRangeFromParams = (searchParams: URLSearchParams): DateRange => {
+  const presetParam = searchParams.get("preset");
+  const startDateParam = searchParams.get("startDate");
+  const endDateParam = searchParams.get("endDate");
+
+  if (!presetParam) {
+    return getDefaultDateRange();
+  }
+
+  const preset = isValidPreset(presetParam) ? presetParam : "30d";
+  return {
+    preset,
+    ...(preset === "custom" && {
+      startDate: startDateParam ?? undefined,
+      endDate: endDateParam ?? undefined,
+    }),
+  };
 };
 
 const formatNumber = (value?: number) =>
@@ -45,6 +71,12 @@ const extractError = (payload: TokenSummaryResponse | null) => {
   if (payload.success) return "Unexpected response.";
   return payload.message || "Unexpected response.";
 };
+
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center">
+    <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+  </div>
+);
 
 const HostCard = ({ host }: { host: HostSummary }) => (
   <div className="rounded-[32px] border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40">
@@ -123,36 +155,95 @@ export default function TokenDashboard({
   initialData,
   initialError,
 }: TokenDashboardProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [data, setData] = useState<TokenSummary | null>(initialData ?? null);
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialError ?? null
   );
   const [isPending, startTransition] = useTransition();
 
+  const dateRange = useMemo(
+    () => parseDateRangeFromParams(searchParams),
+    [searchParams]
+  );
+
   const overall = data?.overall ?? emptySummary.overall;
   const hosts = data?.hosts ?? emptySummary.hosts;
 
-  const handleRefresh = () => {
-    startTransition(async () => {
-      setErrorMessage(null);
-      let payload: TokenSummaryResponse | null = null;
+  const updateUrlParams = useCallback(
+    (newDateRange: DateRange) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("preset", newDateRange.preset);
 
-      try {
-        const response = await fetch("/api/token-consume", { cache: "no-store" });
-        payload = (await response.json()) as TokenSummaryResponse;
-
-        if (!response.ok || !payload.success) {
-          setErrorMessage(extractError(payload));
-          return;
+      if (newDateRange.preset === "custom") {
+        if (newDateRange.startDate) {
+          params.set("startDate", newDateRange.startDate);
+        } else {
+          params.delete("startDate");
         }
-
-        setData(payload.data);
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to refresh data."
-        );
+        if (newDateRange.endDate) {
+          params.set("endDate", newDateRange.endDate);
+        } else {
+          params.delete("endDate");
+        }
+      } else {
+        params.delete("startDate");
+        params.delete("endDate");
       }
-    });
+
+      router.replace(`${pathname}?${params.toString()}`);
+    },
+    [pathname, router, searchParams]
+  );
+
+  const fetchData = useCallback(
+    async (range: DateRange) => {
+      startTransition(async () => {
+        setErrorMessage(null);
+        let payload: TokenSummaryResponse | null = null;
+
+        try {
+          const params = new URLSearchParams();
+          params.set("preset", range.preset);
+          if (range.preset === "custom") {
+            if (range.startDate) params.set("startDate", range.startDate);
+            if (range.endDate) params.set("endDate", range.endDate);
+          }
+
+          const response = await fetch(`/api/token-consume?${params.toString()}`, {
+            cache: "no-store",
+          });
+          payload = (await response.json()) as TokenSummaryResponse;
+
+          if (!response.ok || !payload.success) {
+            setErrorMessage(extractError(payload));
+            return;
+          }
+
+          setData(payload.data);
+        } catch (error) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Unable to refresh data."
+          );
+        }
+      });
+    },
+    []
+  );
+
+  const handleDateRangeChange = useCallback(
+    (newDateRange: DateRange) => {
+      updateUrlParams(newDateRange);
+      fetchData(newDateRange);
+    },
+    [fetchData, updateUrlParams]
+  );
+
+  const handleRefresh = () => {
+    fetchData(dateRange);
   };
 
   return (
@@ -161,31 +252,41 @@ export default function TokenDashboard({
         <header className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200/60 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm shadow-slate-100/60">
-              Token Consume Monitor
+              Token Analytics
             </div>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={isPending}
-              className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-100/60 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-              aria-busy={isPending}
-            >
-              {isPending ? "Refreshing" : "Refresh"}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <DateRangePicker
+                value={dateRange}
+                onChange={handleDateRangeChange}
+              />
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isPending}
+                className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-100/60 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                aria-busy={isPending}
+              >
+                {isPending ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
           </div>
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Aggregated token usage by host
+              Unified Token Dashboard
             </h1>
             <p className="max-w-2xl text-base leading-relaxed text-slate-600">
-              Reads a local <span className="font-semibold">config.json</span> list and
-              fetches token usage from every configured host. Results are aggregated per
-              host so you can compare usage in one place.
+              Monitor API token consumption across all your hosts in real-time. Track usage,
+              costs, and performance metrics from a single dashboard.
             </p>
           </div>
         </header>
 
-        <section className="grid gap-4 rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-xl shadow-slate-200/40">
+        <section className="relative grid gap-4 rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-xl shadow-slate-200/40">
+          {isPending && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-white/60 backdrop-blur-sm">
+              <LoadingSpinner />
+            </div>
+          )}
           <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-7">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Hosts</p>
@@ -231,22 +332,32 @@ export default function TokenDashboard({
         {errorMessage ? (
           <section className="rounded-3xl border border-rose-200 bg-rose-50/80 p-6 text-sm text-rose-700 shadow-lg shadow-rose-100">
             <h2 className="text-base font-semibold text-rose-800">
-              Unable to load token logs
+              Unable to load data
             </h2>
             <p className="mt-2">{errorMessage}</p>
             <p className="mt-3 text-rose-600">
-              Confirm that <span className="font-semibold">config.json</span> exists at the
-              project root and contains a list of entries with valid
-              <span className="font-semibold"> HOST</span> and
-              <span className="font-semibold"> API_KEY</span> values.
+              Please verify your <span className="font-semibold">config.json</span> file
+              is properly configured with valid host credentials.
             </p>
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-8">
+        <section className="relative flex flex-col gap-8">
+          {isPending && hosts.length > 0 && (
+            <div className="absolute inset-0 z-10 flex items-start justify-center rounded-3xl bg-white/40 pt-20 backdrop-blur-sm">
+              <LoadingSpinner />
+            </div>
+          )}
           {hosts.length === 0 && !errorMessage ? (
             <div className="rounded-3xl border border-dashed border-slate-200/80 bg-white/70 p-10 text-center text-sm text-slate-500">
-              No token log entries returned yet.
+              {isPending ? (
+                <div className="flex flex-col items-center gap-3">
+                  <LoadingSpinner />
+                  <p>Loading your data...</p>
+                </div>
+              ) : (
+                "No data available. Check your configuration to get started."
+              )}
             </div>
           ) : null}
 

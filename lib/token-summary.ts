@@ -2,7 +2,7 @@ import "server-only";
 import { readFile } from "fs/promises";
 import path from "path";
 
-import type { HostSummary, TokenSummary } from "./token-types";
+import type { DateRange, HostSummary, TokenSummary } from "./token-types";
 
 type LocalConfig = {
   HOST: string;
@@ -110,12 +110,67 @@ const addItemToSummary = (summary: HostSummary, item: TokenLogItem) => {
   }
 };
 
+const parseDateRange = (
+  dateRange?: DateRange
+): { startTimestamp?: number; endTimestamp?: number } => {
+  if (!dateRange) {
+    return {};
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  let startTimestamp: number | undefined;
+  let endTimestamp: number | undefined;
+
+  switch (dateRange.preset) {
+    case "all":
+      break;
+    case "24h":
+      startTimestamp = now - 24 * 60 * 60;
+      break;
+    case "7d":
+      startTimestamp = now - 7 * 24 * 60 * 60;
+      break;
+    case "30d":
+      startTimestamp = now - 30 * 24 * 60 * 60;
+      break;
+    case "custom":
+      if (dateRange.startDate) {
+        startTimestamp = Math.floor(
+          new Date(dateRange.startDate).getTime() / 1000
+        );
+      }
+      if (dateRange.endDate) {
+        endTimestamp = Math.floor(
+          new Date(dateRange.endDate).getTime() / 1000
+        );
+        endTimestamp += 24 * 60 * 60 - 1;
+      }
+      break;
+  }
+
+  return { startTimestamp, endTimestamp };
+};
+
 const computeCost = (quota: number) => (quota / 1_000_000) * 2;
+
+const validateDateRange = (dateRange?: DateRange): string | null => {
+  if (!dateRange || dateRange.preset !== "custom") {
+    return null;
+  }
+  if (dateRange.startDate && dateRange.endDate) {
+    if (dateRange.startDate > dateRange.endDate) {
+      return "Start date must be before or equal to end date";
+    }
+  }
+  return null;
+};
 
 const buildSummary = (
   configs: LocalConfig[],
-  results: PromiseSettledResult<TokenLogResponse>[]
+  results: PromiseSettledResult<TokenLogResponse>[],
+  dateRange?: DateRange
 ) => {
+  const { startTimestamp, endTimestamp } = parseDateRange(dateRange);
   const groups = new Map<string, HostSummary>();
 
   configs.forEach((config, index) => {
@@ -139,7 +194,15 @@ const buildSummary = (
     const result = results[index];
     if (result.status === "fulfilled") {
       const items = Array.isArray(result.value.data) ? result.value.data : [];
-      items.forEach((item) => addItemToSummary(existing, item));
+      items.forEach((item) => {
+        if (startTimestamp && item.created_at < startTimestamp) {
+          return;
+        }
+        if (endTimestamp && item.created_at > endTimestamp) {
+          return;
+        }
+        addItemToSummary(existing, item);
+      });
     } else {
       const message =
         result.reason instanceof Error
@@ -185,16 +248,23 @@ const buildSummary = (
   return { overall, hosts } satisfies TokenSummary;
 };
 
-export const getTokenSummary = async (): Promise<
+export const getTokenSummary = async (
+  dateRange?: DateRange
+): Promise<
   | { ok: true; data: TokenSummary }
   | { ok: false; error: string }
 > => {
+  const validationError = validateDateRange(dateRange);
+  if (validationError) {
+    return { ok: false, error: validationError };
+  }
+
   try {
     const configs = await loadConfigs();
     const results = await Promise.allSettled(
       configs.map((config) => fetchTokenLogs(config))
     );
-    return { ok: true, data: buildSummary(configs, results) };
+    return { ok: true, data: buildSummary(configs, results, dateRange) };
   } catch (error) {
     return {
       ok: false,
