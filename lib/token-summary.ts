@@ -99,7 +99,7 @@ const fetchTokenLogs = async (config: LocalConfig) => {
   return payload;
 };
 
-const addItemToSummary = (summary: HostSummary, item: TokenLogItem) => {
+const addItemToSummary = (summary: Omit<HostSummary, "id">, item: TokenLogItem) => {
   summary.entries += 1;
   summary.prompt += item.prompt_tokens || 0;
   summary.completion += item.completion_tokens || 0;
@@ -171,11 +171,10 @@ const buildSummary = (
   dateRange?: DateRange
 ) => {
   const { startTimestamp, endTimestamp } = parseDateRange(dateRange);
-  const groups = new Map<string, HostSummary>();
+  const groups = new Map<string, Omit<HostSummary, "id">>();
 
   configs.forEach((config, index) => {
     const existing = groups.get(config.HOST) ?? {
-      host: config.HOST,
       name: config.NAME,
       entries: 0,
       prompt: 0,
@@ -214,8 +213,9 @@ const buildSummary = (
     groups.set(config.HOST, existing);
   });
 
-  const hosts = Array.from(groups.values()).map((host) => ({
+  const hosts = Array.from(groups.values()).map((host, index) => ({
     ...host,
+    id: `host-${index + 1}`,
     cost: computeCost(host.quota),
   }));
 
