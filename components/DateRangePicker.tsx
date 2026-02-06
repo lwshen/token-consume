@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import type { DateRange, DateRangePreset } from "@/lib/token-types";
 
 type DateRangePickerProps = {
@@ -18,10 +16,7 @@ const presets: { value: DateRangePreset; label: string }[] = [
 ];
 
 export default function DateRangePicker({ value, onChange }: DateRangePickerProps) {
-  const [isCustomOpen, setIsCustomOpen] = useState(value.preset === "custom");
-
   const handlePresetClick = (preset: DateRangePreset) => {
-    setIsCustomOpen(preset === "custom");
     if (preset === "custom") {
       onChange({
         preset,

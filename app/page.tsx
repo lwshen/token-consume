@@ -31,7 +31,6 @@ export default async function Home({ searchParams }: HomeProps) {
     <TokenDashboard
       initialData={result.ok ? result.data : null}
       initialError={result.ok ? null : result.error}
-      initialDateRange={dateRange}
     />
   );
 }

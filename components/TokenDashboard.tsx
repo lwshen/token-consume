@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
 import type { DateRange, DateRangePreset, HostSummary, TokenSummary, TokenSummaryResponse } from "@/lib/token-types";
 import DateRangePicker from "./DateRangePicker";
@@ -9,7 +9,6 @@ import DateRangePicker from "./DateRangePicker";
 type TokenDashboardProps = {
   initialData?: TokenSummary | null;
   initialError?: string | null;
-  initialDateRange?: DateRange;
 };
 
 const isValidPreset = (value: string | null): value is DateRangePreset => {
@@ -19,6 +18,25 @@ const isValidPreset = (value: string | null): value is DateRangePreset => {
 const getDefaultDateRange = (): DateRange => ({
   preset: "30d",
 });
+
+const parseDateRangeFromParams = (searchParams: URLSearchParams): DateRange => {
+  const presetParam = searchParams.get("preset");
+  const startDateParam = searchParams.get("startDate");
+  const endDateParam = searchParams.get("endDate");
+
+  if (!presetParam) {
+    return getDefaultDateRange();
+  }
+
+  const preset = isValidPreset(presetParam) ? presetParam : "30d";
+  return {
+    preset,
+    ...(preset === "custom" && {
+      startDate: startDateParam ?? undefined,
+      endDate: endDateParam ?? undefined,
+    }),
+  };
+};
 
 const formatNumber = (value?: number) =>
   typeof value === "number" ? value.toLocaleString() : "—";
@@ -139,7 +157,6 @@ const HostCard = ({ host }: { host: HostSummary }) => (
 export default function TokenDashboard({
   initialData,
   initialError,
-  initialDateRange,
 }: TokenDashboardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -151,8 +168,9 @@ export default function TokenDashboard({
   );
   const [isPending, startTransition] = useTransition();
 
-  const [dateRange, setDateRange] = useState<DateRange>(
-    initialDateRange ?? getDefaultDateRange()
+  const dateRange = useMemo(
+    () => parseDateRangeFromParams(searchParams),
+    [searchParams]
   );
 
   const overall = data?.overall ?? emptySummary.overall;
@@ -221,7 +239,6 @@ export default function TokenDashboard({
 
   const handleDateRangeChange = useCallback(
     (newDateRange: DateRange) => {
-      setDateRange(newDateRange);
       updateUrlParams(newDateRange);
       fetchData(newDateRange);
     },
@@ -231,24 +248,6 @@ export default function TokenDashboard({
   const handleRefresh = () => {
     fetchData(dateRange);
   };
-
-  useEffect(() => {
-    const presetParam = searchParams.get("preset");
-    const startDateParam = searchParams.get("startDate");
-    const endDateParam = searchParams.get("endDate");
-
-    if (presetParam) {
-      const preset = isValidPreset(presetParam) ? presetParam : "30d";
-      const newDateRange: DateRange = {
-        preset,
-        ...(preset === "custom" && {
-          startDate: startDateParam ?? undefined,
-          endDate: endDateParam ?? undefined,
-        }),
-      };
-      setDateRange(newDateRange);
-    }
-  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ed_0%,_#ecfeff_38%,_#eef2ff_75%)] text-slate-900">
