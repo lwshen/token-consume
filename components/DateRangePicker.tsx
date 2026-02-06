@@ -15,7 +15,15 @@ const presets: { value: DateRangePreset; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
+const isValidDateRange = (startDate?: string, endDate?: string): boolean => {
+  if (!startDate || !endDate) return true;
+  return startDate <= endDate;
+};
+
 export default function DateRangePicker({ value, onChange }: DateRangePickerProps) {
+  const hasInvalidRange = value.preset === "custom" &&
+    !isValidDateRange(value.startDate, value.endDate);
+
   const handlePresetClick = (preset: DateRangePreset) => {
     if (preset === "custom") {
       onChange({
@@ -29,19 +37,41 @@ export default function DateRangePicker({ value, onChange }: DateRangePickerProp
   };
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({
-      ...value,
-      preset: "custom",
-      startDate: e.target.value || undefined,
-    });
+    const newStartDate = e.target.value || undefined;
+    // If new start date would be after end date, clear end date
+    if (newStartDate && value.endDate && newStartDate > value.endDate) {
+      onChange({
+        ...value,
+        preset: "custom",
+        startDate: newStartDate,
+        endDate: undefined,
+      });
+    } else {
+      onChange({
+        ...value,
+        preset: "custom",
+        startDate: newStartDate,
+      });
+    }
   };
 
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({
-      ...value,
-      preset: "custom",
-      endDate: e.target.value || undefined,
-    });
+    const newEndDate = e.target.value || undefined;
+    // If new end date would be before start date, clear start date
+    if (newEndDate && value.startDate && newEndDate < value.startDate) {
+      onChange({
+        ...value,
+        preset: "custom",
+        startDate: undefined,
+        endDate: newEndDate,
+      });
+    } else {
+      onChange({
+        ...value,
+        preset: "custom",
+        endDate: newEndDate,
+      });
+    }
   };
 
   return (
@@ -69,7 +99,12 @@ export default function DateRangePicker({ value, onChange }: DateRangePickerProp
             type="date"
             value={value.startDate || ""}
             onChange={handleStartDateChange}
-            className="rounded-full border border-slate-200/70 bg-white/80 px-3 py-1.5 text-xs text-slate-700 shadow-sm shadow-slate-100/60 outline-none focus:border-slate-400"
+            max={value.endDate}
+            className={`rounded-full border bg-white/80 px-3 py-1.5 text-xs text-slate-700 shadow-sm shadow-slate-100/60 outline-none focus:border-slate-400 ${
+              hasInvalidRange
+                ? "border-rose-300 focus:border-rose-400"
+                : "border-slate-200/70"
+            }`}
             placeholder="Start date"
           />
           <span className="text-xs text-slate-400">to</span>
@@ -77,9 +112,17 @@ export default function DateRangePicker({ value, onChange }: DateRangePickerProp
             type="date"
             value={value.endDate || ""}
             onChange={handleEndDateChange}
-            className="rounded-full border border-slate-200/70 bg-white/80 px-3 py-1.5 text-xs text-slate-700 shadow-sm shadow-slate-100/60 outline-none focus:border-slate-400"
+            min={value.startDate}
+            className={`rounded-full border bg-white/80 px-3 py-1.5 text-xs text-slate-700 shadow-sm shadow-slate-100/60 outline-none focus:border-slate-400 ${
+              hasInvalidRange
+                ? "border-rose-300 focus:border-rose-400"
+                : "border-slate-200/70"
+            }`}
             placeholder="End date"
           />
+          {hasInvalidRange && (
+            <span className="text-xs text-rose-500">Invalid range</span>
+          )}
         </div>
       )}
     </div>

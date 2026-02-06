@@ -153,6 +153,18 @@ const parseDateRange = (
 
 const computeCost = (quota: number) => (quota / 1_000_000) * 2;
 
+const validateDateRange = (dateRange?: DateRange): string | null => {
+  if (!dateRange || dateRange.preset !== "custom") {
+    return null;
+  }
+  if (dateRange.startDate && dateRange.endDate) {
+    if (dateRange.startDate > dateRange.endDate) {
+      return "Start date must be before or equal to end date";
+    }
+  }
+  return null;
+};
+
 const buildSummary = (
   configs: LocalConfig[],
   results: PromiseSettledResult<TokenLogResponse>[],
@@ -242,6 +254,11 @@ export const getTokenSummary = async (
   | { ok: true; data: TokenSummary }
   | { ok: false; error: string }
 > => {
+  const validationError = validateDateRange(dateRange);
+  if (validationError) {
+    return { ok: false, error: validationError };
+  }
+
   try {
     const configs = await loadConfigs();
     const results = await Promise.allSettled(
