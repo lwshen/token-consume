@@ -362,7 +362,7 @@ export default function TokenDashboard({
           ) : null}
 
           {hosts.map((host) => (
-            <HostCard key={host.host} host={host} />
+            <HostCard key={host.id} host={host} />
           ))}
         </section>
       </main>

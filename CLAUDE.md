@@ -115,3 +115,7 @@ The `next.config.ts` sets `output: 'standalone'` for optimized Docker builds.
 - Client components use `useTransition` for non-blocking UI updates during data fetches
 - All API responses follow a consistent `{ success: boolean, data?: T, message?: string }` pattern
 - Date filtering happens in-memory after fetching all logs (not at API level)
+
+## Code Quality Standards
+
+- **Never use `eslint-disable` comments**: Do not suppress linting warnings with `eslint-disable-next-line`, `eslint-disable`, or similar comments. Instead, refactor the code to fix the underlying issue properly

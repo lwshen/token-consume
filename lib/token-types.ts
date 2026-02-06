@@ -1,5 +1,5 @@
 export type HostSummary = {
-  host: string;
+  id: string;
   name?: string;
   entries: number;
   prompt: number;
