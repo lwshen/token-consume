@@ -57,6 +57,12 @@ const extractError = (payload: TokenSummaryResponse | null) => {
   return payload.message || "Unexpected response.";
 };
 
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center">
+    <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+  </div>
+);
+
 const HostCard = ({ host }: { host: HostSummary }) => (
   <div className="rounded-[32px] border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -280,7 +286,12 @@ export default function TokenDashboard({
           </div>
         </header>
 
-        <section className="grid gap-4 rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-xl shadow-slate-200/40">
+        <section className="relative grid gap-4 rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-xl shadow-slate-200/40">
+          {isPending && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-white/60 backdrop-blur-sm">
+              <LoadingSpinner />
+            </div>
+          )}
           <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-7">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Hosts</p>
@@ -338,10 +349,22 @@ export default function TokenDashboard({
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-8">
+        <section className="relative flex flex-col gap-8">
+          {isPending && hosts.length > 0 && (
+            <div className="absolute inset-0 z-10 flex items-start justify-center rounded-3xl bg-white/40 pt-20 backdrop-blur-sm">
+              <LoadingSpinner />
+            </div>
+          )}
           {hosts.length === 0 && !errorMessage ? (
             <div className="rounded-3xl border border-dashed border-slate-200/80 bg-white/70 p-10 text-center text-sm text-slate-500">
-              No token log entries returned yet.
+              {isPending ? (
+                <div className="flex flex-col items-center gap-3">
+                  <LoadingSpinner />
+                  <p>Loading token log entries...</p>
+                </div>
+              ) : (
+                "No token log entries returned yet."
+              )}
             </div>
           ) : null}
 
